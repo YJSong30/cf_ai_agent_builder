@@ -57,9 +57,7 @@ export class Chat extends AIChatAgent<Env> {
 
         // Cloudflare AI Adapter
         const workersai = createWorkersAI({ binding: this.env.AI });
-        const model = workersai(
-          "@cf/meta/llama-3.3-70b-instruct-fp8-fast" as any
-        );
+        const model = workersai("@cf/meta/llama-3-8b-instruct" as any);
 
         // Process any pending tool calls from previous messages
         // This handles human-in-the-loop confirmations for tools
@@ -71,11 +69,13 @@ export class Chat extends AIChatAgent<Env> {
         });
 
         const result = streamText({
-          system: `You are a helpful assistant that can do various tasks... 
+          system: `You are a helpful AI assistant. 
 
+Rules:
+1) Your job is to reply naturally and make conversation. Make responses short but engaging
+2) Only if the user asks to schedule a task, use the schedule tool to schedule the task.
 ${getSchedulePrompt({ date: new Date() })}
 
-If the user asks to schedule a task, use the schedule tool to schedule the task.
 `,
 
           messages: convertToModelMessages(processedMessages),
