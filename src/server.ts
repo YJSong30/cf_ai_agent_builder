@@ -13,18 +13,22 @@ import {
   createUIMessageStreamResponse,
   type ToolSet
 } from "ai";
-import { openai } from "@ai-sdk/openai";
+// import { openai } from "@ai-sdk/openai";
+import { createWorkersAI } from "workers-ai-provider";
 import { processToolCalls, cleanupMessages } from "./utils";
 import { tools, executions } from "./tools";
 // import { env } from "cloudflare:workers";
 
-const model = openai("gpt-4o-2024-11-20");
+// const model = openai("gpt-4o-2024-11-20");
 // Cloudflare AI Gateway
 // const openai = createOpenAI({
 //   apiKey: env.OPENAI_API_KEY,
 //   baseURL: env.GATEWAY_BASE_URL,
 // });
 
+export interface Env {
+  AI: any;
+}
 /**
  * Chat Agent implementation that handles real-time AI chat interactions
  */
@@ -50,6 +54,12 @@ export class Chat extends AIChatAgent<Env> {
       execute: async ({ writer }) => {
         // Clean up incomplete tool calls to prevent API errors
         const cleanedMessages = cleanupMessages(this.messages);
+
+        // Cloudflare AI Adapter
+        const workersai = createWorkersAI({ binding: this.env.AI });
+        const model = workersai(
+          "@cf/meta/llama-3.3-70b-instruct-fp8-fast" as any
+        );
 
         // Process any pending tool calls from previous messages
         // This handles human-in-the-loop confirmations for tools
@@ -112,19 +122,8 @@ export default {
   async fetch(request: Request, env: Env, _ctx: ExecutionContext) {
     const url = new URL(request.url);
 
-    if (url.pathname === "/check-open-ai-key") {
-      const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
-      return Response.json({
-        success: hasOpenAIKey
-      });
-    }
-    if (!process.env.OPENAI_API_KEY) {
-      console.error(
-        "OPENAI_API_KEY is not set, don't forget to set it locally in .dev.vars, and use `wrangler secret bulk .dev.vars` to upload it to production"
-      );
-    }
+    // Route the request to our agent or return 404 if not found
     return (
-      // Route the request to our agent or return 404 if not found
       (await routeAgentRequest(request, env)) ||
       new Response("Not found", { status: 404 })
     );
